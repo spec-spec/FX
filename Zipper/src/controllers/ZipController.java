@@ -3,16 +3,19 @@ package controllers;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ResourceBundle;
 import java.util.logging.Logger;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -25,46 +28,27 @@ public class ZipController implements Initializable {
 	@FXML
 	private TextArea mainTextArea;
 	@FXML
-	private Label stringCount;
+	private Label infoLabel;
 	@FXML
-	private TextField searchTextField;
-	File f = new File("C:/Text.txt");
-	private int fromIndex = 0;
+	private TextField openFileName;
+	@FXML
+	private TextField saveFileName;
+	private String fileName = "C:\\Temp.txt";
+	private File f = new File(fileName);
 
 	@Override
 	public void initialize(URL location, ResourceBundle resources) {
-		showRowsNum();
+
 	}
 
 	public void openFile(ActionEvent event) {
-		log.info("open function");
-		try (BufferedReader br = new BufferedReader(new FileReader(f))) {
-			String s;
-			while ((s = br.readLine()) != null) {
-				mainTextArea.appendText(s);
-			}
-			br.close();
-
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		mainTextArea.clear();
+		openFileFromDisk(fileName);
 	}
 
 	public void saveTextToFile(ActionEvent event) {
 		log.info("save function");
-
-		if (!f.exists()) {
-			try {
-				f.createNewFile();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
+		checkAndCreateFile(f);
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(f));
 			bw.append(mainTextArea.getText());
@@ -75,44 +59,87 @@ public class ZipController implements Initializable {
 		}
 	}
 
-	public void searchText(ActionEvent event) {
-		String textToFind = searchTextField.getText();
-		String whereToFind = mainTextArea.getText();
-		int currentStringPlace = whereToFind.indexOf(textToFind, fromIndex);
-		if (currentStringPlace != -1) {
-			mainTextArea.selectRange(textToFind.length() + currentStringPlace,
-					currentStringPlace);
-			fromIndex = textToFind.length() + currentStringPlace;
-			log.info("find in place :" + currentStringPlace);
-		} else {
-			searchTextField.clear();
-			fromIndex = 0;
-		}
-	}
-
-	public void showRowsNum() {
-		mainTextArea.textProperty().addListener(new ChangeListener<String>() {
-			@Override
-			public void changed(
-					final ObservableValue<? extends String> observable,
-					final String oldValue, final String newValue) {
-				stringCount.setText(String.valueOf(rowCount(newValue)));
+	public void openArc(ActionEvent event) {
+		mainTextArea.clear();
+		byte[] buffer = new byte[2048];
+		log.info("open Arc function");
+		if (getFileNameToOpen() != null) {
+			try (ZipInputStream zin = new ZipInputStream(new FileInputStream(
+					getFileNameToOpen()))) {
+				ZipEntry entry;
+				while ((entry = zin.getNextEntry()) != null) {
+					int len = 0;
+					while ((len = zin.read(buffer)) > 0) {
+						String decod = new String(buffer, "utf-8");// oracle example
+						mainTextArea.appendText(decod);
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-		});
-
+		} else
+			infoLabel.setText("error openning file");
 	}
 
-	private int rowCount(String s) {
-		int rowCount = 1;
-		int fromPosition = 0;
-		int nextPosition = 0;
-		while (s.indexOf('\n', fromPosition) != -1) {
-			rowCount++;
-			log.info("string num :" + rowCount);
-			nextPosition = s.indexOf('\n', fromPosition);
-			fromPosition = nextPosition + 1;
+	public void saveArc(ActionEvent event) {
+		log.info("save ARC function");
+		if (getFileNameToSave() != null) {
+			infoLabel.setText(" file name OK");
+			File tmp = new File(getFileNameToSave());
+			checkAndCreateFile(tmp);
+			try (ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(tmp))) {
+				ZipEntry entry1 = new ZipEntry("first file to zip");
+				zout.putNextEntry(entry1);
+				byte[] buffer = mainTextArea.getText().getBytes();
+				zout.write(buffer);
+				zout.closeEntry();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} else
+			infoLabel.setText("wrong file name");
+	}
+
+	private String getFileNameToOpen() {
+		if ((openFileName.getText().indexOf(".zip")) != -1) {
+			return openFileName.getText();
+		} else {
+			log.info("wrong open file name");
+			return null;
 		}
-		return rowCount;
+	}
+
+	private String getFileNameToSave() {
+		if ((saveFileName.getText().indexOf(".zip")) != -1) {
+			return saveFileName.getText();
+		} else {
+			log.info("wrong save file name");
+			return null;
+		}
+	}
+
+	private void openFileFromDisk(String name) {
+		File fo = new File(name);
+		try (BufferedReader br = new BufferedReader(new FileReader(fo))) {
+			String s;
+			while ((s = br.readLine()) != null) {
+				mainTextArea.appendText(s);
+			}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void checkAndCreateFile(File fileToCheck) {
+		if (!fileToCheck.exists()) {
+			try {
+				f.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 }
